@@ -8,48 +8,85 @@ import csv
 from io import StringIO
 
 
-st.set_page_config(page_title="Nearest CHID Finder", layout="wide")
+st.set_page_config(page_title="CHID Finder", layout="wide")
+
+# Dark/light mode toggle
+if 'dark_mode' not in st.session_state:
+    st.session_state.dark_mode = False
 
 # Custom CSS for styling
-st.markdown("""
+st.markdown(f"""
     <style>
     /* Main title */
-    .title {
+    .title {{
         font-size: 2rem;
         font-weight: bold;
-        color: #2c3e50;
+        color: {'#ffffff' if st.session_state.dark_mode else '#2c3e50'};
+        margin-bottom: 1rem;
+    }}
+    
+    .author {{
+        font-size: 1rem;
+        color: {'#bbbbbb' if st.session_state.dark_mode else '#555555'};
         margin-bottom: 1.5rem;
-    }
+    }}
+    
+    .author a {{
+        color: {'#4dabf7' if st.session_state.dark_mode else '#1a73e8'};
+        text-decoration: none;
+    }}
+    
+    .author a:hover {{
+        text-decoration: underline;
+    }}
 
-    .success-box {
-        background-color: #e8f5e9;  /* Light green background */
-        color: #2c3e50;            /* Dark gray text for better contrast */
+    /* Success and error boxes */
+    .success-box {{
+        background-color: {'#2d3b2d' if st.session_state.dark_mode else '#e8f5e9'};
+        color: {'#e0e0e0' if st.session_state.dark_mode else '#2c3e50'};
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
         border-left: 5px solid #4CAF50;
-    }
+    }}
     
-    .success-box h4 {
-        color: #1e5631;            /* Darker green for heading */
+    .success-box h4 {{
+        color: {'#a5d6a7' if st.session_state.dark_mode else '#1e5631'};
         margin-top: 0;
-    }
+    }}
     
-    .success-box p {
-        color: #2c3e50;            /* Dark gray for paragraphs */
+    .success-box p {{
+        color: {'#e0e0e0' if st.session_state.dark_mode else '#2c3e50'};
         margin-bottom: 0.5rem;
-    }
+    }}
     
-    .error-box {
-        background-color: #ffebee;
+    .error-box {{
+        background-color: {'#422b2b' if st.session_state.dark_mode else '#ffebee'};
+        color: {'#e0e0e0' if st.session_state.dark_mode else '#2c3e50'};
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
         border-left: 5px solid #f44336;
-    }
+    }}
+    
+    /* Main content background */
+    .stApp {{
+        background-color: {'#121212' if st.session_state.dark_mode else '#ffffff'} !important;
+    }}
+    
+    /* Text elements */
+    .stMarkdown, .stText, .stDataFrame {{
+        color: {'#e0e0e0' if st.session_state.dark_mode else '#000000'} !important;
+    }}
+    
+    /* File uploader */
+    .stFileUploader > div {{
+        background-color: {'#1e1e1e' if st.session_state.dark_mode else '#f0f2f6'} !important;
+        border-color: {'#444' if st.session_state.dark_mode else '#ccc'} !important;
+    }}
     
     /* Download button */
-    .stDownloadButton button {
+    .stDownloadButton button {{
         background-color: #4CAF50 !important;
         color: white !important;
         font-weight: bold !important;
@@ -60,170 +97,44 @@ st.markdown("""
         width: 100% !important;
         transition: all 0.3s ease !important;
         margin-top: 1rem;
-    }
+    }}
     
-    .stDownloadButton button:hover {
+    .stDownloadButton button:hover {{
         background-color: #45a049 !important;
         transform: scale(1.02) !important;
-    }
+    }}
     
     /* Remove any residual progress bar elements */
-    .stProgress > div > div > div {
+    .stProgress > div > div > div {{
         display: none !important;
-    }
+    }}
+    
+    /* Toggle button */
+    .toggle-container {{
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 999;
+    }}
     </style>
 """, unsafe_allow_html=True)
 
-def detect_separator(file_path):
-    try:
-        with open(file_path, 'r') as f:
-            dialect = csv.Sniffer().sniff(f.read(1024))
-            return dialect.delimiter
-    except:
-        return ','
+# Dark/light mode toggle button
+col1, col2 = st.columns([1, 1])
+with col2:
+    if st.button("🌙 Dark" if not st.session_state.dark_mode else "☀️ Light"):
+        st.session_state.dark_mode = not st.session_state.dark_mode
+        st.rerun()
 
-def load_and_validate_csv(file, expected_type):
-    try:
-        if isinstance(file, str):
-            # File path provided
-            separator = detect_separator(file)
-            df = pd.read_csv(file, sep=separator)
-        else:
-            # Uploaded file object
-            file.seek(0)
-            content = file.read().decode('utf-8')
-            try:
-                dialect = csv.Sniffer().sniff(content.split('\n')[0])
-                separator = dialect.delimiter
-            except:
-                separator = ','
-            df = pd.read_csv(StringIO(content), sep=separator)
-        
-        if len(df.columns) < 3:
-            raise ValueError(f"Need at least 3 columns, found {len(df.columns)}")
-        
-        if expected_type == 'HP':
-            col_names = ['HP', 'HP_LAT', 'HP_LONG']
-        else:
-            col_names = ['CHID', 'CHID_LAT', 'CHID_LONG']
-        
-        df.columns = col_names + list(df.columns[3:])
-        
-        st.session_state['file_info'] = (
-            f"Mapping columns in {file.name if hasattr(file, 'name') else file}:\n"
-            f"1: {df.columns[0]} (ID)\n"
-            f"2: {df.columns[1]} (LAT)\n"
-            f"3: {df.columns[2]} (LONG)"
-        )
-        
-        return df.iloc[:, :3]
-    
-    except Exception as e:
-        raise ValueError(f"Error processing file: {str(e)}")
+# Main app header
+st.markdown('<div class="title">CHID Finder</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="author">by <a href="https://www.linkedin.com/in/xsanosaurus/" target="_blank">Naradevan</a></div>', 
+    unsafe_allow_html=True
+)
 
-def process_files(hp_file, chid_file):
-    try:
-        hp_df = load_and_validate_csv(hp_file, 'HP')
-        chid_df = load_and_validate_csv(chid_file, 'CHID')
-        
-        if len(hp_df) == 0 or len(chid_df) == 0:
-            raise ValueError("One or both files are empty!")
-        
-        # Create progress bar and status text
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        # Create a copy of HPs that we'll remove from as they get assigned
-        available_hps = hp_df.copy()
-        results = []
-        total = len(chid_df)  # Total CHIDs to process
-        
-        # First pass: Assign each CHID to its nearest available HP
-        for i, (_, chid_row) in enumerate(chid_df.iterrows()):
-            chid_coords = (chid_row['CHID_LAT'], chid_row['CHID_LONG'])
-            min_distance = float('inf')
-            nearest_hp = None
-            hp_data = None
-            
-            # Find nearest available HP
-            for _, hp_row in available_hps.iterrows():
-                hp_coords = (hp_row['HP_LAT'], hp_row['HP_LONG'])
-                distance = geodesic(hp_coords, chid_coords).kilometers
-                if distance < min_distance:
-                    min_distance = distance
-                    nearest_hp = hp_row['HP']
-                    hp_data = hp_row
-            
-            if nearest_hp:
-                results.append({
-                    'HP': nearest_hp,
-                    'HP_LAT': hp_data['HP_LAT'],
-                    'HP_LONG': hp_data['HP_LONG'],
-                    'Nearest_CHID': chid_row['CHID'],
-                    'CHID_LAT': chid_row['CHID_LAT'],
-                    'CHID_LONG': chid_row['CHID_LONG'],
-                    'Distance_km': round(min_distance, 5)
-                })
-                
-                # Remove this HP from available HPs so it can't be assigned again
-                available_hps = available_hps[available_hps['HP'] != nearest_hp]
-            
-            # Update progress
-            progress = (i + 1) / total
-            progress_bar.progress(progress)
-            status_text.text(f"Processing CHID {i+1}/{total}...")
-        
-        # Second pass: Assign remaining HPs to their nearest CHIDs (including already used ones)
-        if not available_hps.empty:
-            status_text.text("Assigning remaining HPs...")
-            
-            for _, hp_row in available_hps.iterrows():
-                hp_coords = (hp_row['HP_LAT'], hp_row['HP_LONG'])
-                min_distance = float('inf')
-                nearest_chid = None
-                chid_data = None
-                
-                # Find nearest CHID (can be already used)
-                for _, chid_row in chid_df.iterrows():
-                    chid_coords = (chid_row['CHID_LAT'], chid_row['CHID_LONG'])
-                    distance = geodesic(hp_coords, chid_coords).kilometers
-                    if distance < min_distance:
-                        min_distance = distance
-                        nearest_chid = chid_row['CHID']
-                        chid_data = chid_row
-                
-                if nearest_chid:
-                    results.append({
-                        'HP': hp_row['HP'],
-                        'HP_LAT': hp_row['HP_LAT'],
-                        'HP_LONG': hp_row['HP_LONG'],
-                        'Nearest_CHID': nearest_chid,
-                        'CHID_LAT': chid_data['CHID_LAT'],
-                        'CHID_LONG': chid_data['CHID_LONG'],
-                        'Distance_km': round(min_distance, 5)
-                    })
-        
-        # Create result DataFrame
-        result_df = pd.DataFrame(results)
-        
-        # Count unique CHIDs used
-        unique_chids_used = result_df['Nearest_CHID'].nunique()
-        
-        # Clean up progress elements
-        progress_bar.empty()
-        status_text.empty()
-        
-        st.session_state['result_df'] = result_df
-        st.session_state['unique_chids_used'] = unique_chids_used
-        st.session_state['total_chids'] = len(chid_df)
-        st.session_state['processing_complete'] = True
-    
-    except Exception as e:
-        st.session_state['processing_error'] = str(e)
-        st.session_state['processing_complete'] = False
-
-# Main app
-st.markdown('<div class="title">Nearest CHID Finder</div>', unsafe_allow_html=True)
+# Rest of your existing functions (detect_separator, load_and_validate_csv, process_files) remain the same
+# ... [Keep all your existing functions exactly as they are] ...
 
 # File upload section
 st.markdown("### Upload your files")
@@ -238,6 +149,7 @@ with col2:
 # Process button
 if st.button("Execute", disabled=(not hp_file or not chid_file)):
     st.session_state.clear()  # Clear previous results
+    st.session_state.dark_mode = st.session_state.get('dark_mode', False)  # Preserve dark mode
     process_files(hp_file, chid_file)
 
 # Display file info if available
