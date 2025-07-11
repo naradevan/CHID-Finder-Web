@@ -12,65 +12,50 @@ st.set_page_config(page_title="Nearest CHID Finder", layout="wide")
 
 # Custom CSS for styling
 st.markdown("""
-    <div style="text-align: center; margin-bottom: 2rem;">
-        <h1 style="font-size: 2.5rem; font-weight: 700; color: #2c3e50; margin-bottom: 0.5rem;">CHID Finder</h1>
-        <p style="font-size: 1.1rem; margin: 0;">
-            by <a href="https://www.linkedin.com/in/xsanosaurus/" target="_blank" style="color: #0077B5; text-decoration: none; font-weight: 600; transition: all 0.2s ease;">Naradevan</a>
-        </p>
-    </div>
-
-    .success-box {
-        background-color: #e8f5e9;  /* Light green background */
-        color: #2c3e50;            /* Dark gray text for better contrast */
-        padding: 1rem;
-        border-radius: 5px;
-        margin: 1rem 0;
-        border-left: 5px solid #4CAF50;
-    }
-    
-    .success-box h4 {
-        color: #1e5631;            /* Darker green for heading */
-        margin-top: 0;
-    }
-    
-    .success-box p {
-        color: #2c3e50;            /* Dark gray for paragraphs */
+<style>
+    .stApp { background-color: #121212; }
+    .title { 
+        font-size: 3rem; 
+        font-weight: bold;
+        color: white;
         margin-bottom: 0.5rem;
     }
-    
-    .error-box {
-        background-color: #ffebee;
+    .author { 
+        font-size: 1.1rem;
+        color: #bbbbbb;
+        margin-bottom: 2rem;
+    }
+    .author a {
+        color: #4dabf7;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+    .author a:hover {
+        color: #6bc1ff;
+        text-decoration: underline;
+    }
+    .stMarkdown, .stText, .stDataFrame {
+        color: #e0e0e0 !important;
+    }
+    .stFileUploader > div {
+        background-color: #1e1e1e !important;
+        border: 1px solid #444 !important;
+    }
+    .success-box {
+        background-color: #2d3b2d;
+        border-left: 5px solid #4CAF50;
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
-        border-left: 5px solid #f44336;
     }
-    
-    /* Download button */
-    .stDownloadButton button {
-        background-color: #4CAF50 !important;
-        color: white !important;
-        font-weight: bold !important;
-        padding: 0.5rem 1rem !important;
-        border-radius: 5px !important;
-        border: none !important;
-        font-size: 1rem !important;
-        width: 100% !important;
-        transition: all 0.3s ease !important;
-        margin-top: 1rem;
-    }
-    
-    .stDownloadButton button:hover {
-        background-color: #45a049 !important;
-        transform: scale(1.02) !important;
-    }
-    
-    /* Remove any residual progress bar elements */
-    .stProgress > div > div > div {
-        display: none !important;
-    }
-    </style>
+</style>
 """, unsafe_allow_html=True)
+
+# Header with improved spacing
+st.markdown('<div class="title">CHID Finder</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="author">by <a href="https://linkedin.com/in/xsanosaurus" target="_blank">Naradevan</a></div>',
+    unsafe_allow_html=True
 
 def detect_separator(file_path):
     try:
