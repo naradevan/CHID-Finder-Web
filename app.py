@@ -1,9 +1,12 @@
+import os
+os.environ['TK_SILENCE_DEPRECATION'] = '1'  # Disable Tkinter warnings
 import pandas as pd
 from geopy.distance import geodesic
 import streamlit as st
 import os
 import csv
 from io import StringIO
+
 
 st.set_page_config(page_title="Nearest CHID Finder", layout="wide")
 
