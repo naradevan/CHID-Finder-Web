@@ -19,7 +19,7 @@ st.markdown("""
     .author { 
         font-size: 1.5rem;
         color: #bbbbbb;
-        margin-bottom: 2rem;
+        margin-bottom: 0rem;
     }
     .author a {
         color: #4dabf7;
