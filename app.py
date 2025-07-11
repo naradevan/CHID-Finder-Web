@@ -17,7 +17,7 @@ st.markdown("""
         margin-bottom: 0.05rem;
     }
     .author { 
-        font-size: 1.1rem;
+        font-size: 2rem;
         color: #bbbbbb;
         margin-bottom: 2rem;
     }
