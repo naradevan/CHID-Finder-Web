@@ -21,14 +21,23 @@ st.markdown("""
         margin-bottom: 1.5rem;
     }
 
-    
-    /* Success and error boxes */
     .success-box {
-        background-color: #ffffff;
+        background-color: #e8f5e9;  /* Light green background */
+        color: #2c3e50;            /* Dark gray text for better contrast */
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
         border-left: 5px solid #4CAF50;
+    }
+    
+    .success-box h4 {
+        color: #1e5631;            /* Darker green for heading */
+        margin-top: 0;
+    }
+    
+    .success-box p {
+        color: #2c3e50;            /* Dark gray for paragraphs */
+        margin-bottom: 0.5rem;
     }
     
     .error-box {
