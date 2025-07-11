@@ -56,6 +56,7 @@ st.markdown('<div class="title">CHID Finder</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="author">by <a href="https://linkedin.com/in/xsanosaurus" target="_blank">Naradevan</a></div>',
     unsafe_allow_html=True
+)
 
 def detect_separator(file_path):
     try:
