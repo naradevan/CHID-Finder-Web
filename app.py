@@ -13,41 +13,50 @@ st.set_page_config(page_title="Nearest CHID Finder", layout="wide")
 # Custom CSS for styling
 st.markdown("""
     <style>
-    .stApp {
-        max-width: 1000px;
-        padding: 2rem;
+    /* Existing styles... */
+    
+    /* New download button styles */
+    .stDownloadButton button {
+        background-color: #4CAF50 !important;
+        color: white !important;
+        font-weight: bold !important;
+        padding: 0.5rem 1rem !important;
+        border-radius: 5px !important;
+        border: none !important;
+        font-size: 1rem !important;
+        width: 100% !important;
+        transition: all 0.3s ease !important;
     }
-    .title {
-        font-size: 2rem;
-        font-weight: bold;
-        margin-bottom: 1.5rem;
+    
+    .stDownloadButton button:hover {
+        background-color: #45a049 !important;
+        transform: scale(1.02) !important;
     }
-    .file-uploader {
-        border: 2px dashed #ccc;
-        border-radius: 5px;
-        padding: 2rem;
-        text-align: center;
-        margin-bottom: 1.5rem;
-    }
-    .success-box {
-        background-color: #e6f7e6;
-        padding: 1rem;
-        border-radius: 5px;
-        border-left: 5px solid #2e7d32;
-        margin-top: 1rem;
-    }
-    .error-box {
-        background-color: #ffebee;
-        padding: 1rem;
-        border-radius: 5px;
-        border-left: 5px solid #c62828;
-        margin-top: 1rem;
-    }
-    .progress-container {
-        margin: 1.5rem 0;
+    
+    .download-container {
+        background: #f0f8ff;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+        border-left: 5px solid #4CAF50;
     }
     </style>
 """, unsafe_allow_html=True)
+
+# Then modify your download button section to:
+if 'processing_complete' in st.session_state and st.session_state['processing_complete']:
+    csv = st.session_state['result_df'].to_csv(index=False).encode('utf-8')
+    
+    st.markdown('<div class="download-container">', unsafe_allow_html=True)
+    st.markdown("### Download Results")
+    st.download_button(
+        label="⬇️ DOWNLOAD CSV NOW",
+        data=csv,
+        file_name='HPID_with_CHID_assignments.csv',
+        mime='text/csv',
+        key='primary-download'
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def detect_separator(file_path):
     try:
