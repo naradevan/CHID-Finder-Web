@@ -24,7 +24,7 @@ st.markdown("""
     
     /* Success and error boxes */
     .success-box {
-        background-color: #e8f5e9;  /* Light green background */
+        background-color: #ffffff;
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
