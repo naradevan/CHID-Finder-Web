@@ -1,202 +1,243 @@
 import pandas as pd
 from geopy.distance import geodesic
-from tkinter import Tk, Label, Button, filedialog, messagebox, ttk, StringVar
-from tkinterdnd2 import DND_FILES, TkinterDnD
-import threading
-import sys
+import streamlit as st
 import os
 import csv
+from io import StringIO
 
-# Add to top of nearest_chid_finder.py
-if getattr(sys, 'frozen', False):
-    os.environ['GEOPY_CACHE_DIR'] = os.path.join(sys._MEIPASS, 'geopy')
+st.set_page_config(page_title="Nearest CHID Finder", layout="wide")
 
-class NearestCHIDApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Nearest CHID Finder")
-        self.root.geometry("500x300")
-        
-        # Variables
-        self.hp_file = StringVar()
-        self.chid_file = StringVar()
-        self.status = StringVar(value="Ready")
-        
-        # GUI Elements
-        Label(root, text="Drag and drop files or browse manually:").pack(pady=10)
-        
-        # Drag and Drop Area
-        self.drop_label = Label(root, text="Drop HPID.csv and CHID.csv here", relief="groove", width=50, height=5)
-        self.drop_label.pack(pady=10)
-        self.root.drop_target_register(DND_FILES)
-        self.root.dnd_bind('<<Drop>>', self.on_drop)
-        
-        # File Selection Buttons
-        Button(root, text="Select HPID.csv", command=lambda: self.browse_file('HPID')).pack(pady=5)
-        Button(root, text="Select CHID.csv", command=lambda: self.browse_file('CHID')).pack(pady=5)
-        
-        # Progress Bar
-        self.progress = ttk.Progressbar(root, orient="horizontal", length=300, mode="determinate")
-        self.progress.pack(pady=10)
-        
-        # Execute Button
-        Button(root, text="Execute", command=self.start_processing).pack(pady=10)
-        
-        # Status Label
-        self.status_label = Label(root, textvariable=self.status)
-        self.status_label.pack(pady=5)
-    
-    def browse_file(self, file_type):
-        """Manual file selection."""
-        file = filedialog.askopenfilename(title=f"Select {file_type}.csv", filetypes=[("CSV Files", "*.csv")])
-        if file:
-            if file_type == 'HPID':
-                self.hp_file.set(file)
-            else:
-                self.chid_file.set(file)
-            self.update_drop_label()
-    
-    def on_drop(self, event):
-        """Handle drag-and-drop."""
-        files = event.data.split()
-        if len(files) == 2:
-            for f in files:
-                f = f.strip('{}')
-                if 'HPID' in f:
-                    self.hp_file.set(f)
-                elif 'CHID' in f:
-                    self.chid_file.set(f)
-            self.update_drop_label()
+# Custom CSS for styling
+st.markdown("""
+    <style>
+    .stApp {
+        max-width: 1000px;
+        padding: 2rem;
+    }
+    .title {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 1.5rem;
+    }
+    .file-uploader {
+        border: 2px dashed #ccc;
+        border-radius: 5px;
+        padding: 2rem;
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+    .success-box {
+        background-color: #e6f7e6;
+        padding: 1rem;
+        border-radius: 5px;
+        border-left: 5px solid #2e7d32;
+        margin-top: 1rem;
+    }
+    .error-box {
+        background-color: #ffebee;
+        padding: 1rem;
+        border-radius: 5px;
+        border-left: 5px solid #c62828;
+        margin-top: 1rem;
+    }
+    .progress-container {
+        margin: 1.5rem 0;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+def detect_separator(file_path):
+    try:
+        with open(file_path, 'r') as f:
+            dialect = csv.Sniffer().sniff(f.read(1024))
+            return dialect.delimiter
+    except:
+        return ','
+
+def load_and_validate_csv(file, expected_type):
+    try:
+        if isinstance(file, str):
+            # File path provided
+            separator = detect_separator(file)
+            df = pd.read_csv(file, sep=separator)
         else:
-            messagebox.showerror("Error", "Please drop exactly 2 files (HPID and CHID CSVs).")
-    
-    def update_drop_label(self):
-        """Update the drop area label with selected files."""
-        hp = "No file selected" if not self.hp_file.get() else self.hp_file.get().split('/')[-1]
-        chid = "No file selected" if not self.chid_file.get() else self.chid_file.get().split('/')[-1]
-        self.drop_label.config(text=f"HPID: {hp}\nCHID: {chid}")
-    
-    def start_processing(self):
-        """Start processing in a separate thread to keep GUI responsive."""
-        if not self.hp_file.get() or not self.chid_file.get():
-            messagebox.showerror("Error", "Please select both files first!")
-            return
+            # Uploaded file object
+            file.seek(0)
+            content = file.read().decode('utf-8')
+            try:
+                dialect = csv.Sniffer().sniff(content.split('\n')[0])
+                separator = dialect.delimiter
+            except:
+                separator = ','
+            df = pd.read_csv(StringIO(content), sep=separator)
         
-        self.status.set("Processing...")
-        self.progress['value'] = 0
-        threading.Thread(target=self.process_files, daemon=True).start()
-    
-    def detect_separator(self, file_path):
-        """Detect the CSV separator by sampling the first few lines."""
-        try:
-            with open(file_path, 'r') as f:
-                dialect = csv.Sniffer().sniff(f.read(1024))
-                return dialect.delimiter
-        except:
-            # Fallback to comma if detection fails
-            return ','
-    
-    def load_and_validate_csv(self, file_path, expected_type):
-        """Load CSV using column positions only (1st=ID, 2nd=Lat, 3rd=Long)"""
-        try:
-            separator = self.detect_separator(file_path)
-            df = pd.read_csv(file_path, sep=separator)
-            
-            # Require at least 3 columns
-            if len(df.columns) < 3:
-                raise ValueError(f"Need at least 3 columns in {file_path}, found {len(df.columns)}")
-            
-            # Map columns by position regardless of headers
-            mapping = {
-                'HP': {0: 'HP', 1: 'HP_LAT', 2: 'HP_LONG'},
-                'CHID': {0: 'CHID', 1: 'CHID_LAT', 2: 'CHID_LONG'}
-            }[expected_type]
-            
-            # Show mapping to user
-            self.status.set(
-                f"Mapping columns in {file_path.split('/')[-1]}:\n"
-                f"1: {df.columns[0]} → {mapping[0]}\n"
-                f"2: {df.columns[1]} → {mapping[1]}\n"
-                f"3: {df.columns[2]} → {mapping[2]}"
-            )
-            
-            # Rename columns
-            df = df.rename(columns={
-                df.columns[0]: mapping[0],
-                df.columns[1]: mapping[1], 
-                df.columns[2]: mapping[2]
-            })
-            
-            # Keep only first 3 columns in case there are extras
-            return df.iloc[:, :3]
+        if len(df.columns) < 3:
+            raise ValueError(f"Need at least 3 columns, found {len(df.columns)}")
         
-        except Exception as e:
-            raise ValueError(f"Error processing {file_path}: {str(e)}")
+        if expected_type == 'HP':
+            col_names = ['HP', 'HP_LAT', 'HP_LONG']
+        else:
+            col_names = ['CHID', 'CHID_LAT', 'CHID_LONG']
+        
+        df.columns = col_names + list(df.columns[3:])
+        
+        st.session_state['file_info'] = (
+            f"Mapping columns in {file.name if hasattr(file, 'name') else file}:\n"
+            f"1: {df.columns[0]} (ID)\n"
+            f"2: {df.columns[1]} (LAT)\n"
+            f"3: {df.columns[2]} (LONG)"
+        )
+        
+        return df.iloc[:, :3]
+    
+    except Exception as e:
+        raise ValueError(f"Error processing file: {str(e)}")
 
-    def find_nearest_chid(self, hp_row, chid_df):
-        """Finds the nearest CHID for an HP (ensures ALL CHIDs are considered)"""
-        hp_coords = (hp_row['HP_LAT'], hp_row['HP_LONG'])
-        min_distance = float('inf')
-        nearest_chid = None
-        nearest_lat = None
-        nearest_long = None
+def process_files(hp_file, chid_file):
+    try:
+        hp_df = load_and_validate_csv(hp_file, 'HP')
+        chid_df = load_and_validate_csv(chid_file, 'CHID')
         
-        # Check EVERY CHID point (no early termination)
-        for _, chid_row in chid_df.iterrows():
+        if len(hp_df) == 0 or len(chid_df) == 0:
+            raise ValueError("One or both files are empty!")
+        
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        # Create a copy of HPs that we'll remove from as they get assigned
+        available_hps = hp_df.copy()
+        results = []
+        total = len(chid_df)  # Total CHIDs to process
+        
+        # First pass: Assign each CHID to its nearest available HP
+        for i, (_, chid_row) in enumerate(chid_df.iterrows()):
             chid_coords = (chid_row['CHID_LAT'], chid_row['CHID_LONG'])
-            distance = geodesic(hp_coords, chid_coords).kilometers
+            min_distance = float('inf')
+            nearest_hp = None
+            hp_data = None
             
-            if distance < min_distance:
-                min_distance = distance
-                nearest_chid = chid_row['CHID']
-                nearest_lat = chid_row['CHID_LAT']
-                nearest_long = chid_row['CHID_LONG']
-        
-        # Guarantee a result (even if distance is large)
-        return nearest_chid, min_distance, nearest_lat, nearest_long
-
-    def process_files(self):
-        """Process all HPs against all CHIDs (complete 1:1 mapping)"""
-        try:
-            hp_df = self.load_and_validate_csv(self.hp_file.get(), 'HP')
-            chid_df = self.load_and_validate_csv(self.chid_file.get(), 'CHID')
+            # Find nearest available HP
+            for _, hp_row in available_hps.iterrows():
+                hp_coords = (hp_row['HP_LAT'], hp_row['HP_LONG'])
+                distance = geodesic(hp_coords, chid_coords).kilometers
+                if distance < min_distance:
+                    min_distance = distance
+                    nearest_hp = hp_row['HP']
+                    hp_data = hp_row
             
-            total = len(hp_df)
-            results = []
-            
-            for i, (_, hp_row) in enumerate(hp_df.iterrows()):
-                # Every HP gets processed with all CHIDs
-                nearest_chid, distance, chid_lat, chid_long = self.find_nearest_chid(hp_row, chid_df)
-                
+            if nearest_hp:
                 results.append({
-                    'HP': hp_row['HP'],
-                    'HP_LAT': hp_row['HP_LAT'],
-                    'HP_LONG': hp_row['HP_LONG'],
-                    'Nearest_CHID': nearest_chid,
-                    'CHID_LAT': chid_lat,
-                    'CHID_LONG': chid_long,
-                    'Distance_km': round(distance, 5)
+                    'HP': nearest_hp,
+                    'HP_LAT': hp_data['HP_LAT'],
+                    'HP_LONG': hp_data['HP_LONG'],
+                    'Nearest_CHID': chid_row['CHID'],
+                    'CHID_LAT': chid_row['CHID_LAT'],
+                    'CHID_LONG': chid_row['CHID_LONG'],
+                    'Distance_km': round(min_distance, 5)
                 })
                 
-                # Update progress
-                progress = (i + 1) / total * 100
-                self.progress['value'] = progress
-                self.status.set(f"Processing {i + 1}/{total}...")
-                self.root.update_idletasks()
+                # Remove this HP from available HPs so it can't be assigned again
+                available_hps = available_hps[available_hps['HP'] != nearest_hp]
             
-            # Save results
-            output_path = self.hp_file.get().replace('.csv', '_with_nearest_CHID.csv')
-            pd.DataFrame(results).to_csv(output_path, index=False)
-            
-            self.status.set(f"Done! Saved to:\n{output_path}")
-            messagebox.showinfo("Success", "Processing completed successfully!")
+            # Update progress
+            progress = (i + 1) / total
+            progress_bar.progress(progress)
+            status_text.text(f"Processing CHID {i+1}/{total}...")
         
-        except Exception as e:
-            self.status.set("Error occurred!")
-            messagebox.showerror("Error", f"An error occurred:\n{str(e)}")
+        # Second pass: Assign remaining HPs to their nearest CHIDs (including already used ones)
+        if not available_hps.empty:
+            status_text.text("Assigning remaining HPs...")
+            
+            for _, hp_row in available_hps.iterrows():
+                hp_coords = (hp_row['HP_LAT'], hp_row['HP_LONG'])
+                min_distance = float('inf')
+                nearest_chid = None
+                chid_data = None
+                
+                # Find nearest CHID (can be already used)
+                for _, chid_row in chid_df.iterrows():
+                    chid_coords = (chid_row['CHID_LAT'], chid_row['CHID_LONG'])
+                    distance = geodesic(hp_coords, chid_coords).kilometers
+                    if distance < min_distance:
+                        min_distance = distance
+                        nearest_chid = chid_row['CHID']
+                        chid_data = chid_row
+                
+                if nearest_chid:
+                    results.append({
+                        'HP': hp_row['HP'],
+                        'HP_LAT': hp_row['HP_LAT'],
+                        'HP_LONG': hp_row['HP_LONG'],
+                        'Nearest_CHID': nearest_chid,
+                        'CHID_LAT': chid_data['CHID_LAT'],
+                        'CHID_LONG': chid_data['CHID_LONG'],
+                        'Distance_km': round(min_distance, 5)
+                    })
+        
+        # Create result DataFrame
+        result_df = pd.DataFrame(results)
+        
+        # Count unique CHIDs used
+        unique_chids_used = result_df['Nearest_CHID'].nunique()
+        
+        # Display success message
+        status_text.empty()
+        progress_bar.empty()
+        
+        st.session_state['result_df'] = result_df
+        st.session_state['unique_chids_used'] = unique_chids_used
+        st.session_state['total_chids'] = len(chid_df)
+        st.session_state['processing_complete'] = True
+    
+    except Exception as e:
+        st.session_state['processing_error'] = str(e)
+        st.session_state['processing_complete'] = False
 
-# Run the application
-if __name__ == "__main__":
-    root = TkinterDnD.Tk()
-    app = NearestCHIDApp(root)
-    root.mainloop()
+# Main app
+st.markdown('<div class="title">Nearest CHID Finder</div>', unsafe_allow_html=True)
+
+# File upload section
+st.markdown("### Upload your files")
+col1, col2 = st.columns(2)
+
+with col1:
+    hp_file = st.file_uploader("Select HPID.csv", type=['csv'], key='hp_uploader')
+
+with col2:
+    chid_file = st.file_uploader("Select CHID.csv", type=['csv'], key='chid_uploader')
+
+# Process button
+if st.button("Execute", disabled=(not hp_file or not chid_file)):
+    st.session_state.clear()  # Clear previous results
+    process_files(hp_file, chid_file)
+
+# Display file info if available
+if 'file_info' in st.session_state:
+    st.text(st.session_state['file_info'])
+
+# Display results or errors
+if 'processing_complete' in st.session_state:
+    if st.session_state['processing_complete']:
+        st.markdown('<div class="success-box">'
+                   '<h4>Processing Completed!</h4>'
+                   f'<p>Assigned {len(st.session_state["result_df"])} HP-CHID pairs.</p>'
+                   f'<p>Used {st.session_state["unique_chids_used"]} out of {st.session_state["total_chids"]} CHIDs.</p>'
+                   '</div>', unsafe_allow_html=True)
+        
+        # Download button for results
+        csv = st.session_state['result_df'].to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="Download Results",
+            data=csv,
+            file_name='HPID_with_CHID_assignments.csv',
+            mime='text/csv'
+        )
+        
+        # Show a preview of the results
+        st.markdown("### Results Preview")
+        st.dataframe(st.session_state['result_df'].head())
+    else:
+        st.markdown(f'<div class="error-box">'
+                    '<h4>Error Occurred!</h4>'
+                    f'<p>{st.session_state["processing_error"]}</p>'
+                    '</div>', unsafe_allow_html=True)
