@@ -14,10 +14,10 @@ st.markdown("""
         font-size: 5rem; 
         font-weight: bold;
         color: white;
-        margin-bottom: 0.05rem;
+        margin-bottom: 0rem;
     }
     .author { 
-        font-size: 2rem;
+        font-size: 1.5rem;
         color: #bbbbbb;
         margin-bottom: 2rem;
     }
