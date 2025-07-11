@@ -30,6 +30,19 @@ C101,-6.11111,106.11111
 
 ## Installation
 
+## Requirements
+1. Python 3.8+
+2. Streamlit
+3. Pandas
+4. Geopy
+
+Author
+👤 Naradevan
+https://www.linkedin.com/in/xsanosaurus/
+
+License
+MIT © 2023
+
 ```bash
 git clone https://github.com/yourusername/chid-finder.git
 cd chid-finder
