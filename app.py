@@ -20,10 +20,11 @@ st.markdown("""
         color: #2c3e50;
         margin-bottom: 1.5rem;
     }
+
     
     /* Success and error boxes */
     .success-box {
-        background-color: #e8f5e9;
+        background-color: #e8f5e9;  /* Light green background */
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
