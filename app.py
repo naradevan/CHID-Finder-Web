@@ -12,14 +12,12 @@ st.set_page_config(page_title="Nearest CHID Finder", layout="wide")
 
 # Custom CSS for styling
 st.markdown("""
-    <style>
-    /* Main title */
-    .title {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #2c3e50;
-        margin-bottom: 1.5rem;
-    }
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 style="font-size: 2.5rem; font-weight: 700; color: #2c3e50; margin-bottom: 0.5rem;">CHID Finder</h1>
+        <p style="font-size: 1.1rem; margin: 0;">
+            by <a href="https://www.linkedin.com/in/xsanosaurus/" target="_blank" style="color: #0077B5; text-decoration: none; font-weight: 600; transition: all 0.2s ease;">Naradevan</a>
+        </p>
+    </div>
 
     .success-box {
         background-color: #e8f5e9;  /* Light green background */
