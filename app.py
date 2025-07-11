@@ -43,6 +43,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Add this to your existing code (modify the download section)
+
 if 'processing_complete' in st.session_state and st.session_state['processing_complete']:
     # Only show download section if not already downloaded
     if 'file_downloaded' not in st.session_state:
@@ -51,19 +53,26 @@ if 'processing_complete' in st.session_state and st.session_state['processing_co
         st.markdown('<div class="download-container">', unsafe_allow_html=True)
         st.markdown("### Download Results")
         
+        if st.download_button(
+            label="⬇️ DOWNLOAD CSV NOW",
+            data=csv,
+            file_name='HPID_with_CHID_assignments.csv',
+            mime='text/csv',
+            key='primary-download'
+        ):
             # Set flag when download is clicked
             st.session_state['file_downloaded'] = True
             st.rerun()  # Rerun to update the UI
             
-        st.markdown('</div>', unsafe_allow_html=True)
-    else:
+ ##       st.markdown('</div>', unsafe_allow_html=True)
+ ##   else:
         # Show a success message instead of the button
-        st.markdown("""
-        <div class="success-box">
-            <p>✅ File downloaded successfully!</p>
-            <p>Check your downloads folder for "HPID_with_CHID_assignments.csv"</p>
-        </div>
-        """, unsafe_allow_html=True)
+ ##       st.markdown("""
+ ##       <div class="success-box">
+ ##           <p>✅ File downloaded successfully!</p>
+ ##           <p>Check your downloads folder for "HPID_with_CHID_assignments.csv"</p>
+ ##       </div>
+ ##       """, unsafe_allow_html=True)
 
 def detect_separator(file_path):
     try:
