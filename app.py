@@ -15,7 +15,7 @@ st.markdown("""
 <style>
     .stApp { background-color: #121212; }
     .title { 
-        font-size: 5rem; 
+        font-size: 3.5rem; 
         font-weight: bold;
         color: white;
         margin-bottom: 0.5rem;
@@ -207,7 +207,7 @@ def process_files(hp_file, chid_file):
         st.session_state['processing_complete'] = False
 
 # Main app
-st.markdown('<div class="title">Nearest CHID Finder</div>', unsafe_allow_html=True)
+#st.markdown('<div class="title">Nearest CHID Finder</div>', unsafe_allow_html=True)
 
 # File upload section
 st.markdown("### Upload your files")
