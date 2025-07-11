@@ -8,7 +8,7 @@ import csv
 from io import StringIO
 
 
-st.set_page_config(page_title="Nearest CHID Finder", layout="wide")
+st.set_page_config(page_title="CHID Finder", layout="wide")
 
 # Custom CSS for styling
 st.markdown("""
@@ -205,9 +205,6 @@ def process_files(hp_file, chid_file):
     except Exception as e:
         st.session_state['processing_error'] = str(e)
         st.session_state['processing_complete'] = False
-
-# Main app
-#st.markdown('<div class="title">Nearest CHID Finder</div>', unsafe_allow_html=True)
 
 # File upload section
 st.markdown("### Upload your files")
