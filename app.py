@@ -32,14 +32,6 @@ st.markdown("""
         background-color: #45a049 !important;
         transform: scale(1.02) !important;
     }
-    
-    .download-container {
-        background: #f0f8ff;
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin: 1rem 0;
-        border-left: 5px solid #4CAF50;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -52,14 +44,7 @@ if 'processing_complete' in st.session_state and st.session_state['processing_co
         
         st.markdown('<div class="download-container">', unsafe_allow_html=True)
         st.markdown("### Download Results")
-        
-        if st.download_button(
-            label="⬇️ DOWNLOAD CSV NOW",
-            data=csv,
-            file_name='HPID_with_CHID_assignments.csv',
-            mime='text/csv',
-            key='primary-download'
-        ):
+
             # Set flag when download is clicked
             st.session_state['file_downloaded'] = True
             st.rerun()  # Rerun to update the UI
