@@ -6,36 +6,74 @@ import io
 
 st.set_page_config(page_title="CHID Finder v2.0 Web", layout="wide")
 
-def load_csv(uploaded_file, expected_type):
-    """Auto-detect columns like your desktop version (position-based)"""
+def load_csv(uploaded_file):
+    """Load CSV with automatic delimiter detection."""
     try:
-        # Read file with auto delimiter detection
         text = uploaded_file.getvalue().decode("utf-8")
-        dialect = csv.Sniffer().sniff(text.split("\n")[0])
-        df = pd.read_csv(io.StringIO(text), sep=dialect.delimiter)
+        sniffer = csv.Sniffer()
+        dialect = sniffer.sniff(text.split("\n")[0])
+        return pd.read_csv(io.StringIO(text), sep=dialect.delimiter)
+    except:
+        return pd.read_csv(io.StringIO(text))  # Fallback
+
+def find_nearest_chid(self, hp_row, chid_df):
+    """Finds the nearest CHID for an HP (ensures ALL CHIDs are considered)"""
+    hp_coords = (hp_row['HP_LAT'], hp_row['HP_LONG'])
+    min_distance = float('inf')
+    nearest_chid = None
+    nearest_lat = None
+    nearest_long = None
+    
+    # Check EVERY CHID point (no early termination)
+    for _, chid_row in chid_df.iterrows():
+        chid_coords = (chid_row['CHID_LAT'], chid_row['CHID_LONG'])
+        distance = geodesic(hp_coords, chid_coords).kilometers
         
-        # Require at least 3 columns
-        if len(df.columns) < 3:
-            raise ValueError("File must have ≥3 columns (ID, Lat, Long)")
+        if distance < min_distance:
+            min_distance = distance
+            nearest_chid = chid_row['CHID']
+            nearest_lat = chid_row['CHID_LAT']
+            nearest_long = chid_row['CHID_LONG']
+    
+    # Guarantee a result (even if distance is large)
+    return {
+        'CHID': nearest_chid,
+        'Distance_km': round(min_distance, 5),
+        'CHID_LAT': nearest_lat,
+        'CHID_LONG': nearest_long
+    }
+
+def process_files(self):
+    """Process all HPs against all CHIDs (complete 1:1 mapping)"""
+    try:
+        hp_df = self.load_and_validate_csv(self.hp_file.get(), 'HP')
+        chid_df = self.load_and_validate_csv(self.chid_file.get(), 'CHID')
         
-        # Auto-map columns by position
-        col_map = {
-            'HP': {0: 'HP', 1: 'HP_LAT', 2: 'HP_LONG'},
-            'CHID': {0: 'CHID', 1: 'CHID_LAT', 2: 'CHID_LONG'}
-        }[expected_type]
+        results = []
+        total = len(hp_df)
         
-        # Show mapping in the interface
-        st.info(f"Detected columns in {uploaded_file.name}:\n" +
-                f"1. {df.columns[0]} → {col_map[0]}\n" +
-                f"2. {df.columns[1]} → {col_map[1]}\n" +
-                f"3. {df.columns[2]} → {col_map[2]}")
+        for i, (_, hp_row) in enumerate(hp_df.iterrows()):
+            # Every HP gets processed
+            nearest = self.find_nearest_chid(hp_row, chid_df)
+            
+            results.append({
+                'HP': hp_row['HP'],
+                'HP_LAT': hp_row['HP_LAT'],
+                'HP_LONG': hp_row['HP_LONG'],
+                **nearest  # Unpacks all CHID data
+            })
+            
+            # Update progress
+            self.progress['value'] = (i + 1) / total * 100
+            self.status.set(f"Processing HP {i+1}/{total}")
+            self.root.update_idletasks()
         
-        # Rename columns
-        return df.rename(columns={
-            df.columns[0]: col_map[0],
-            df.columns[1]: col_map[1],
-            df.columns[2]: col_map[2]
-        }).iloc[:, :3]  # Keep only first 3 columns
+        # Save ALL results
+        output_path = self.hp_file.get().replace('.csv', '_nearest_CHIDs.csv')
+        pd.DataFrame(results).to_csv(output_path, index=False)
+        
+        self.status.set(f"Complete! Saved to {output_path}")
+        messagebox.showinfo("Success", f"Matched {len(results)} HPs to CHIDs")
         
     except Exception as e:
         st.error(f"⚠️ Error loading {uploaded_file.name}: {str(e)}")
