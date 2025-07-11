@@ -43,8 +43,8 @@ C102,-6.22222,106.22222
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/naradevan/chid-finder.git
-   cd chid-finder
+   git clone https://github.com/naradevan/CHID-Finder-Web.git
+   cd CHID-Finder-Web
    ```
 
 2. Install dependencies:
@@ -63,13 +63,14 @@ C102,-6.22222,106.22222
 3. Pandas
 4. Geopy
 
-Author
-👤 Naradevan
-https://www.linkedin.com/in/xsanosaurus/
+# Terms of Use
 
-## Terms of Use
-- � **Non-Commercial**: Free to use with attribution
-- 💼 **Commercial**: Requires written permission
-- ⚠️ **No Warranty**: Use at your own risk
+- ✅ **Non-Commercial**: Free with attribution to [Naradevan](https://www.linkedin.com/in/xsanosaurus/)  
+- 💼 **Commercial**: Requires [written permission](mailto:xsanosaurus@gmail.com)  
+- ⚠️ **No Warranty**: Provided "AS IS" without liability  
 
-© 2025 Naradevan - All rights reserved
+---
+
+© 2025 [Naradevan](https://www.linkedin.com/in/xsanosaurus/) • All rights reserved  
+
+*THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...*
