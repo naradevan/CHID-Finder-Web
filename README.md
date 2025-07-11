@@ -1,6 +1,6 @@
 # CHID Finder
 
-[![Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)]([https://your-app-url.streamlit.app/](https://chid-finder-naradevan.streamlit.app/)
+[![Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)]([https://chid-finder-naradevan.streamlit.app/])
 
 A geospatial matching tool that automatically assigns the nearest CHID locations to HPID points.
 
