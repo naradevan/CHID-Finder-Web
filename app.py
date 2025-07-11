@@ -1,62 +1,78 @@
+import os
+os.environ['TK_SILENCE_DEPRECATION'] = '1'  # Disable Tkinter warnings
 import pandas as pd
 from geopy.distance import geodesic
 import streamlit as st
+import os
+import csv
 from io import StringIO
 
-# App Config
-st.set_page_config(page_title="CHID Finder", layout="wide")
 
-# Custom Dark Mode CSS
+st.set_page_config(page_title="Nearest CHID Finder", layout="wide")
+
+# Custom CSS for styling
 st.markdown("""
-<style>
-    .stApp { background-color: #121212; }
-    .title { 
-        font-size: 3rem; 
+    <style>
+    /* Main title */
+    .title {
+        font-size: 2rem;
         font-weight: bold;
-        color: white;
-        margin-bottom: 0.5rem;
+        color: #2c3e50;
+        margin-bottom: 1.5rem;
     }
-    .author { 
-        font-size: 1.1rem;
-        color: #bbbbbb;
-        margin-bottom: 2rem;
-    }
-    .author a {
-        color: #4dabf7;
-        text-decoration: none;
-        transition: all 0.2s;
-    }
-    .author a:hover {
-        color: #6bc1ff;
-        text-decoration: underline;
-    }
-    .stMarkdown, .stText, .stDataFrame {
-        color: #e0e0e0 !important;
-    }
-    .stFileUploader > div {
-        background-color: #1e1e1e !important;
-        border: 1px solid #444 !important;
-    }
+
     .success-box {
-        background-color: #2d3b2d;
-        border-left: 5px solid #4CAF50;
+        background-color: #e8f5e9;  /* Light green background */
+        color: #2c3e50;            /* Dark gray text for better contrast */
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
+        border-left: 5px solid #4CAF50;
     }
-</style>
+    
+    .success-box h4 {
+        color: #1e5631;            /* Darker green for heading */
+        margin-top: 0;
+    }
+    
+    .success-box p {
+        color: #2c3e50;            /* Dark gray for paragraphs */
+        margin-bottom: 0.5rem;
+    }
+    
+    .error-box {
+        background-color: #ffebee;
+        padding: 1rem;
+        border-radius: 5px;
+        margin: 1rem 0;
+        border-left: 5px solid #f44336;
+    }
+    
+    /* Download button */
+    .stDownloadButton button {
+        background-color: #4CAF50 !important;
+        color: white !important;
+        font-weight: bold !important;
+        padding: 0.5rem 1rem !important;
+        border-radius: 5px !important;
+        border: none !important;
+        font-size: 1rem !important;
+        width: 100% !important;
+        transition: all 0.3s ease !important;
+        margin-top: 1rem;
+    }
+    
+    .stDownloadButton button:hover {
+        background-color: #45a049 !important;
+        transform: scale(1.02) !important;
+    }
+    
+    /* Remove any residual progress bar elements */
+    .stProgress > div > div > div {
+        display: none !important;
+    }
+    </style>
 """, unsafe_allow_html=True)
-
-# Header with improved spacing
-st.markdown('<div class="title">CHID Finder</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="author">by <a href="https://linkedin.com/in/xsanosaurus" target="_blank">Naradevan</a></div>',
-    unsafe_allow_html=True
-)
-
-# [Keep all your existing file processing functions here]
-# [Keep your existing file upload and processing logic here]
-# [Keep your existing results display logic here]
 
 def detect_separator(file_path):
     try:
@@ -113,6 +129,7 @@ def process_files(hp_file, chid_file):
         if len(hp_df) == 0 or len(chid_df) == 0:
             raise ValueError("One or both files are empty!")
         
+        # Create progress bar and status text
         progress_bar = st.progress(0)
         status_text = st.empty()
         
@@ -192,9 +209,9 @@ def process_files(hp_file, chid_file):
         # Count unique CHIDs used
         unique_chids_used = result_df['Nearest_CHID'].nunique()
         
-        # Display success message
-        status_text.empty()
+        # Clean up progress elements
         progress_bar.empty()
+        status_text.empty()
         
         st.session_state['result_df'] = result_df
         st.session_state['unique_chids_used'] = unique_chids_used
@@ -231,7 +248,7 @@ if 'file_info' in st.session_state:
 if 'processing_complete' in st.session_state:
     if st.session_state['processing_complete']:
         st.markdown('<div class="success-box">'
-                   '<h4>Processing Completed!</h4>'
+                   '<h4>✅ Processing Completed Successfully!</h4>'
                    f'<p>Assigned {len(st.session_state["result_df"])} HP-CHID pairs.</p>'
                    f'<p>Used {st.session_state["unique_chids_used"]} out of {st.session_state["total_chids"]} CHIDs.</p>'
                    '</div>', unsafe_allow_html=True)
@@ -240,11 +257,9 @@ if 'processing_complete' in st.session_state:
         if 'file_downloaded' not in st.session_state:
             csv = st.session_state['result_df'].to_csv(index=False).encode('utf-8')
             
-            st.markdown('<div class="download-container">', unsafe_allow_html=True)
             st.markdown("### Download Results")
-            
             if st.download_button(
-                label="⬇️ DOWNLOAD CSV NOW",
+                label="DOWNLOAD RESULT",
                 data=csv,
                 file_name='HPID_with_CHID_assignments.csv',
                 mime='text/csv',
@@ -253,14 +268,12 @@ if 'processing_complete' in st.session_state:
                 # Set flag when download is clicked
                 st.session_state['file_downloaded'] = True
                 st.rerun()  # Rerun to update the UI
-                
-            st.markdown('</div>', unsafe_allow_html=True)
         else:
             # Show a success message instead of the button
             st.markdown("""
             <div class="success-box">
-                <p>✅ File downloaded successfully!</p>
-                <p>Check your downloads folder for "HPID_with_CHID_assignments.csv"</p>
+                <h4>✅ Download Complete!</h4>
+                <p>File "HPID_with_CHID_assignments.csv" has been saved to your downloads folder.</p>
             </div>
             """, unsafe_allow_html=True)
         
@@ -269,6 +282,6 @@ if 'processing_complete' in st.session_state:
         st.dataframe(st.session_state['result_df'].head())
     else:
         st.markdown(f'<div class="error-box">'
-                    '<h4>Error Occurred!</h4>'
+                    '<h4>❌ Error Occurred!</h4>'
                     f'<p>{st.session_state["processing_error"]}</p>'
                     '</div>', unsafe_allow_html=True)
