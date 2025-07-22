@@ -48,6 +48,13 @@ st.markdown("""
         border-radius: 5px;
         margin: 1rem 0;
     }
+    .warning-box {
+        background-color: #3b3b2d;
+        border-left: 5px solid #FFC107;
+        padding: 1rem;
+        border-radius: 5px;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -83,6 +90,10 @@ def load_and_validate_csv(file, expected_type):
                 separator = ','
             df = pd.read_csv(StringIO(content), sep=separator)
         
+        # Check if DataFrame is empty
+        if df.empty:
+            return None, f"{expected_type} file is empty. It will be ignored in processing."
+        
         if len(df.columns) < 3:
             raise ValueError(f"Need at least 3 columns, found {len(df.columns)}")
         
@@ -93,25 +104,48 @@ def load_and_validate_csv(file, expected_type):
         
         df.columns = col_names + list(df.columns[3:])
         
-        st.session_state['file_info'] = (
+        file_info = (
             f"Mapping columns in {file.name if hasattr(file, 'name') else file}:\n"
             f"1: {df.columns[0]} (ID)\n"
             f"2: {df.columns[1]} (LAT)\n"
             f"3: {df.columns[2]} (LONG)"
         )
         
-        return df.iloc[:, :3]
+        return df.iloc[:, :3], file_info
     
     except Exception as e:
         raise ValueError(f"Error processing file: {str(e)}")
 
 def process_files(hp_file, chid_file):
     try:
-        hp_df = load_and_validate_csv(hp_file, 'HP')
-        chid_df = load_and_validate_csv(chid_file, 'CHID')
+        # Initialize session state variables
+        st.session_state['processing_complete'] = False
+        st.session_state['processing_error'] = None
+        st.session_state['file_info'] = ""
+        st.session_state['warnings'] = []
         
-        if len(hp_df) == 0 or len(chid_df) == 0:
-            raise ValueError("One or both files are empty!")
+        # Load and validate files
+        hp_df, hp_info = load_and_validate_csv(hp_file, 'HP')
+        if hp_info:  # Only add info if file was processed (not empty)
+            st.session_state['file_info'] += hp_info + "\n\n"
+        
+        chid_df, chid_info = load_and_validate_csv(chid_file, 'CHID')
+        if chid_info:  # Only add info if file was processed (not empty)
+            st.session_state['file_info'] += chid_info
+        
+        # Check if either file is empty
+        if hp_df is None and chid_df is None:
+            raise ValueError("Both files are empty! No processing can be done.")
+        elif hp_df is None:
+            st.session_state['warnings'].append("HP file is empty. Only CHID data will be shown.")
+            st.session_state['result_df'] = chid_df
+            st.session_state['processing_complete'] = True
+            return
+        elif chid_df is None:
+            st.session_state['warnings'].append("CHID file is empty. Only HP data will be shown.")
+            st.session_state['result_df'] = hp_df
+            st.session_state['processing_complete'] = True
+            return
         
         # Create progress bar and status text
         progress_bar = st.progress(0)
@@ -191,7 +225,7 @@ def process_files(hp_file, chid_file):
         result_df = pd.DataFrame(results)
         
         # Count unique CHIDs used
-        unique_chids_used = result_df['Nearest_CHID'].nunique()
+        unique_chids_used = result_df['Nearest_CHID'].nunique() if not result_df.empty else 0
         
         # Clean up progress elements
         progress_bar.empty()
@@ -199,7 +233,7 @@ def process_files(hp_file, chid_file):
         
         st.session_state['result_df'] = result_df
         st.session_state['unique_chids_used'] = unique_chids_used
-        st.session_state['total_chids'] = len(chid_df)
+        st.session_state['total_chids'] = len(chid_df) if chid_df is not None else 0
         st.session_state['processing_complete'] = True
     
     except Exception as e:
@@ -225,42 +259,53 @@ if st.button("Execute", disabled=(not hp_file or not chid_file)):
 if 'file_info' in st.session_state:
     st.text(st.session_state['file_info'])
 
+# Display warnings if any
+if 'warnings' in st.session_state and st.session_state['warnings']:
+    for warning in st.session_state['warnings']:
+        st.markdown(f'<div class="warning-box">{warning}</div>', unsafe_allow_html=True)
+
 # Display results or errors
 if 'processing_complete' in st.session_state:
     if st.session_state['processing_complete']:
-        st.markdown('<div class="success-box">'
-                   '<h4>✅ Processing Completed Successfully!</h4>'
-                   f'<p>Assigned {len(st.session_state["result_df"])} HP-CHID pairs.</p>'
-                   f'<p>Used {st.session_state["unique_chids_used"]} out of {st.session_state["total_chids"]} CHIDs.</p>'
-                   '</div>', unsafe_allow_html=True)
-        
-        # Only show download section if not already downloaded
-        if 'file_downloaded' not in st.session_state:
-            csv = st.session_state['result_df'].to_csv(index=False).encode('utf-8')
+        if 'result_df' in st.session_state and not st.session_state['result_df'].empty:
+            st.markdown('<div class="success-box">'
+                       '<h4>✅ Processing Completed Successfully!</h4>'
+                       f'<p>Assigned {len(st.session_state["result_df"])} HP-CHID pairs.</p>'
+                       f'<p>Used {st.session_state["unique_chids_used"]} out of {st.session_state["total_chids"]} CHIDs.</p>'
+                       '</div>', unsafe_allow_html=True)
             
-            st.markdown("### Download Results")
-            if st.download_button(
-                label="DOWNLOAD RESULT",
-                data=csv,
-                file_name='HPID_with_CHID_assignments.csv',
-                mime='text/csv',
-                key='primary-download'
-            ):
-                # Set flag when download is clicked
-                st.session_state['file_downloaded'] = True
-                st.rerun()  # Rerun to update the UI
+            # Only show download section if not already downloaded
+            if 'file_downloaded' not in st.session_state:
+                csv = st.session_state['result_df'].to_csv(index=False).encode('utf-8')
+                
+                st.markdown("### Download Results")
+                if st.download_button(
+                    label="DOWNLOAD RESULT",
+                    data=csv,
+                    file_name='HPID_with_CHID_assignments.csv',
+                    mime='text/csv',
+                    key='primary-download'
+                ):
+                    # Set flag when download is clicked
+                    st.session_state['file_downloaded'] = True
+                    st.rerun()  # Rerun to update the UI
+            else:
+                # Show a success message instead of the button
+                st.markdown("""
+                <div class="success-box">
+                    <h4>✅ Download Complete!</h4>
+                    <p>File "HPID_with_CHID_assignments.csv" has been saved to your downloads folder.</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Show a preview of the results
+            st.markdown("### Results Preview")
+            st.dataframe(st.session_state['result_df'].head())
         else:
-            # Show a success message instead of the button
-            st.markdown("""
-            <div class="success-box">
-                <h4>✅ Download Complete!</h4>
-                <p>File "HPID_with_CHID_assignments.csv" has been saved to your downloads folder.</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Show a preview of the results
-        st.markdown("### Results Preview")
-        st.dataframe(st.session_state['result_df'].head())
+            st.markdown('<div class="warning-box">'
+                       '<h4>⚠️ No Assignments Made</h4>'
+                       '<p>The files contained no valid data to process.</p>'
+                       '</div>', unsafe_allow_html=True)
     else:
         st.markdown(f'<div class="error-box">'
                     '<h4>❌ Error Occurred!</h4>'
