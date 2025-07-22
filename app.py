@@ -3,10 +3,8 @@ os.environ['TK_SILENCE_DEPRECATION'] = '1'  # Disable Tkinter warnings
 import pandas as pd
 from geopy.distance import geodesic
 import streamlit as st
-import os
 import csv
 from io import StringIO
-
 
 st.set_page_config(page_title="CHID Finder", layout="wide")
 
@@ -48,9 +46,9 @@ st.markdown("""
         border-radius: 5px;
         margin: 1rem 0;
     }
-    .warning-box {
-        background-color: #3b3b2d;
-        border-left: 5px solid #FFC107;
+    .error-box {
+        background-color: #3b2d2d;
+        border-left: 5px solid #f44336;
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
@@ -90,9 +88,8 @@ def load_and_validate_csv(file, expected_type):
                 separator = ','
             df = pd.read_csv(StringIO(content), sep=separator)
         
-        # Check if DataFrame is empty
-        if df.empty:
-            return None, f"{expected_type} file is empty. It will be ignored in processing."
+        # Clean data - remove empty rows and rows with missing coordinates
+        df = df.dropna(how='all')
         
         if len(df.columns) < 3:
             raise ValueError(f"Need at least 3 columns, found {len(df.columns)}")
@@ -104,48 +101,40 @@ def load_and_validate_csv(file, expected_type):
         
         df.columns = col_names + list(df.columns[3:])
         
+        # Convert coordinates to numeric and drop invalid rows
+        df[df.columns[1]] = pd.to_numeric(df[df.columns[1]], errors='coerce')
+        df[df.columns[2]] = pd.to_numeric(df[df.columns[2]], errors='coerce')
+        df = df.dropna(subset=df.columns[1:3], how='any')
+        
+        if df.empty:
+            raise ValueError(f"No valid rows found in {expected_type} file after cleaning")
+        
         file_info = (
             f"Mapping columns in {file.name if hasattr(file, 'name') else file}:\n"
             f"1: {df.columns[0]} (ID)\n"
             f"2: {df.columns[1]} (LAT)\n"
-            f"3: {df.columns[2]} (LONG)"
+            f"3: {df.columns[2]} (LONG)\n"
+            f"Valid rows: {len(df)}"
         )
         
         return df.iloc[:, :3], file_info
     
     except Exception as e:
-        raise ValueError(f"Error processing file: {str(e)}")
+        raise ValueError(f"Error processing {expected_type} file: {str(e)}")
 
 def process_files(hp_file, chid_file):
     try:
-        # Initialize session state variables
-        st.session_state['processing_complete'] = False
-        st.session_state['processing_error'] = None
-        st.session_state['file_info'] = ""
-        st.session_state['warnings'] = []
+        # Clear previous results
+        st.session_state.clear()
         
         # Load and validate files
         hp_df, hp_info = load_and_validate_csv(hp_file, 'HP')
-        if hp_info:  # Only add info if file was processed (not empty)
-            st.session_state['file_info'] += hp_info + "\n\n"
-        
         chid_df, chid_info = load_and_validate_csv(chid_file, 'CHID')
-        if chid_info:  # Only add info if file was processed (not empty)
-            st.session_state['file_info'] += chid_info
         
-        # Check if either file is empty
-        if hp_df is None and chid_df is None:
-            raise ValueError("Both files are empty! No processing can be done.")
-        elif hp_df is None:
-            st.session_state['warnings'].append("HP file is empty. Only CHID data will be shown.")
-            st.session_state['result_df'] = chid_df
-            st.session_state['processing_complete'] = True
-            return
-        elif chid_df is None:
-            st.session_state['warnings'].append("CHID file is empty. Only HP data will be shown.")
-            st.session_state['result_df'] = hp_df
-            st.session_state['processing_complete'] = True
-            return
+        st.session_state['file_info'] = f"{hp_info}\n\n{chid_info}"
+        
+        if hp_df.empty or chid_df.empty:
+            raise ValueError("One or both files are empty after validation!")
         
         # Create progress bar and status text
         progress_bar = st.progress(0)
@@ -154,7 +143,7 @@ def process_files(hp_file, chid_file):
         # Create a copy of HPs that we'll remove from as they get assigned
         available_hps = hp_df.copy()
         results = []
-        total = len(chid_df)  # Total CHIDs to process
+        total_chids = len(chid_df)  # Total CHIDs to process
         
         # First pass: Assign each CHID to its nearest available HP
         for i, (_, chid_row) in enumerate(chid_df.iterrows()):
@@ -166,11 +155,14 @@ def process_files(hp_file, chid_file):
             # Find nearest available HP
             for _, hp_row in available_hps.iterrows():
                 hp_coords = (hp_row['HP_LAT'], hp_row['HP_LONG'])
-                distance = geodesic(hp_coords, chid_coords).kilometers
-                if distance < min_distance:
-                    min_distance = distance
-                    nearest_hp = hp_row['HP']
-                    hp_data = hp_row
+                try:
+                    distance = geodesic(hp_coords, chid_coords).kilometers
+                    if distance < min_distance:
+                        min_distance = distance
+                        nearest_hp = hp_row['HP']
+                        hp_data = hp_row
+                except:
+                    continue
             
             if nearest_hp:
                 results.append({
@@ -187,13 +179,13 @@ def process_files(hp_file, chid_file):
                 available_hps = available_hps[available_hps['HP'] != nearest_hp]
             
             # Update progress
-            progress = (i + 1) / total
+            progress = (i + 1) / total_chids
             progress_bar.progress(progress)
-            status_text.text(f"Processing CHID {i+1}/{total}...")
+            status_text.text(f"Processing CHID {i+1}/{total_chids}...")
         
         # Second pass: Assign remaining HPs to their nearest CHIDs (including already used ones)
         if not available_hps.empty:
-            status_text.text("Assigning remaining HPs...")
+            status_text.text(f"Assigning {len(available_hps)} remaining HPs...")
             
             for _, hp_row in available_hps.iterrows():
                 hp_coords = (hp_row['HP_LAT'], hp_row['HP_LONG'])
@@ -204,11 +196,14 @@ def process_files(hp_file, chid_file):
                 # Find nearest CHID (can be already used)
                 for _, chid_row in chid_df.iterrows():
                     chid_coords = (chid_row['CHID_LAT'], chid_row['CHID_LONG'])
-                    distance = geodesic(hp_coords, chid_coords).kilometers
-                    if distance < min_distance:
-                        min_distance = distance
-                        nearest_chid = chid_row['CHID']
-                        chid_data = chid_row
+                    try:
+                        distance = geodesic(hp_coords, chid_coords).kilometers
+                        if distance < min_distance:
+                            min_distance = distance
+                            nearest_chid = chid_row['CHID']
+                            chid_data = chid_row
+                    except:
+                        continue
                 
                 if nearest_chid:
                     results.append({
@@ -225,7 +220,7 @@ def process_files(hp_file, chid_file):
         result_df = pd.DataFrame(results)
         
         # Count unique CHIDs used
-        unique_chids_used = result_df['Nearest_CHID'].nunique() if not result_df.empty else 0
+        unique_chids_used = result_df['Nearest_CHID'].nunique()
         
         # Clean up progress elements
         progress_bar.empty()
@@ -233,7 +228,8 @@ def process_files(hp_file, chid_file):
         
         st.session_state['result_df'] = result_df
         st.session_state['unique_chids_used'] = unique_chids_used
-        st.session_state['total_chids'] = len(chid_df) if chid_df is not None else 0
+        st.session_state['total_chids'] = len(chid_df)
+        st.session_state['total_hps'] = len(hp_df)
         st.session_state['processing_complete'] = True
     
     except Exception as e:
@@ -252,60 +248,37 @@ with col2:
 
 # Process button
 if st.button("Execute", disabled=(not hp_file or not chid_file)):
-    st.session_state.clear()  # Clear previous results
     process_files(hp_file, chid_file)
 
 # Display file info if available
 if 'file_info' in st.session_state:
     st.text(st.session_state['file_info'])
 
-# Display warnings if any
-if 'warnings' in st.session_state and st.session_state['warnings']:
-    for warning in st.session_state['warnings']:
-        st.markdown(f'<div class="warning-box">{warning}</div>', unsafe_allow_html=True)
-
 # Display results or errors
 if 'processing_complete' in st.session_state:
     if st.session_state['processing_complete']:
-        if 'result_df' in st.session_state and not st.session_state['result_df'].empty:
-            st.markdown('<div class="success-box">'
-                       '<h4>✅ Processing Completed Successfully!</h4>'
-                       f'<p>Assigned {len(st.session_state["result_df"])} HP-CHID pairs.</p>'
-                       f'<p>Used {st.session_state["unique_chids_used"]} out of {st.session_state["total_chids"]} CHIDs.</p>'
-                       '</div>', unsafe_allow_html=True)
-            
-            # Only show download section if not already downloaded
-            if 'file_downloaded' not in st.session_state:
-                csv = st.session_state['result_df'].to_csv(index=False).encode('utf-8')
-                
-                st.markdown("### Download Results")
-                if st.download_button(
-                    label="DOWNLOAD RESULT",
-                    data=csv,
-                    file_name='HPID_with_CHID_assignments.csv',
-                    mime='text/csv',
-                    key='primary-download'
-                ):
-                    # Set flag when download is clicked
-                    st.session_state['file_downloaded'] = True
-                    st.rerun()  # Rerun to update the UI
-            else:
-                # Show a success message instead of the button
-                st.markdown("""
-                <div class="success-box">
-                    <h4>✅ Download Complete!</h4>
-                    <p>File "HPID_with_CHID_assignments.csv" has been saved to your downloads folder.</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # Show a preview of the results
-            st.markdown("### Results Preview")
-            st.dataframe(st.session_state['result_df'].head())
-        else:
-            st.markdown('<div class="warning-box">'
-                       '<h4>⚠️ No Assignments Made</h4>'
-                       '<p>The files contained no valid data to process.</p>'
-                       '</div>', unsafe_allow_html=True)
+        st.markdown('<div class="success-box">'
+                   '<h4>✅ Processing Completed Successfully!</h4>'
+                   f'<p>Assigned {len(st.session_state["result_df"])} HP-CHID pairs.</p>'
+                   f'<p>Used {st.session_state["unique_chids_used"]} out of {st.session_state["total_chids"]} CHIDs.</p>'
+                   f'<p>Total HPs processed: {st.session_state["total_hps"]}</p>'
+                   '</div>', unsafe_allow_html=True)
+        
+        # Download section
+        csv = st.session_state['result_df'].to_csv(index=False).encode('utf-8')
+        
+        st.markdown("### Download Results")
+        st.download_button(
+            label="DOWNLOAD RESULT",
+            data=csv,
+            file_name='HPID_with_CHID_assignments.csv',
+            mime='text/csv',
+            key='primary-download'
+        )
+        
+        # Show a preview of the results
+        st.markdown("### Results Preview")
+        st.dataframe(st.session_state['result_df'].head())
     else:
         st.markdown(f'<div class="error-box">'
                     '<h4>❌ Error Occurred!</h4>'
